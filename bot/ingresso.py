@@ -113,6 +113,74 @@ def get_seats(sections, context: CallbackContext) -> None:
     job = context.job
     context.bot.send_message(job.context, text=message, parse_mode='Markdown')
 
+def get_seats_offline(sections) -> None:
+    message = "```\n"
+    for section in sections:
+        theatre_name = section['theatre']['name']
+        message += f'[!] {theatre_name}\n'
+        
+        session_id = section['session_id']
+        
+        for unique_section in section['sections']:
+            section_name = unique_section['name']
+            message += f'    [+] {section_name}\n'
+            section_id = unique_section['id']
+            api_url = f'https://api.ingresso.com/v1/sessions/{session_id}/sections/{section_id}/seats'
+            headers = {
+                'authority':'api.ingresso.com',
+                'accept': 'application/json',
+                'accept-language': 'pt-BR,pt;q=0.9',
+                'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="100", "Google Chrome";v="100"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Linux"',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-site',
+                'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'                    
+            }
+            response = requests.get(url=api_url, headers=headers)
+            if response.status_code == 200:
+                lines = response.json()['lines']
+                occupation = get_occupation(lines)
+                generate_map(lines)
+
+                message += occupation
+            else:
+                message += f'    [+] Occupancy not available\n'
+        message += '\n'
+    message += '```'
+    print(message)
+    # context.bot.send_message(job.context, text=message, parse_mode='Markdown')
+
+def generate_map(lines) -> None:
+    map = ""
+    pre_line_size = 0
+    diff = 0
+
+    for line in lines:
+        line_size = len(line['seats'])
+        if pre_line_size > line_size:
+            diff += (pre_line_size - line_size)//2
+        elif (pre_line_size < line_size) and (diff > 0):
+            diff = (line_size - pre_line_size)//2
+        for i in range(diff):
+            map += ' '
+        pre_line_size = line_size
+        for seat in line['seats']:
+            if seat['status'] == 'Available':
+                map += 'o'
+            else:
+                map += '-'
+        map += '\n'
+    print(map)
+
+def run_tasks_offline() -> None:
+    THEATERS = []
+    SECTIONS = []
+
+    get_cinemas(theaters=THEATERS)
+    get_sections(theaters=THEATERS, sections=SECTIONS)
+    get_seats_offline(sections=SECTIONS)
 
 def run_tasks(context: CallbackContext) -> None:
     THEATERS = []
@@ -164,4 +232,4 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
-    main()
+    run_tasks_offline()
