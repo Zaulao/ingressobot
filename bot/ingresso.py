@@ -10,13 +10,13 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-def get_cinemas(theaters):
+def get_cinemas(theaters) -> None:
     CITY_ID = "22" # Recife
     EVENT_ID = "24985" # Twenty One Pilots Cinema Experience
     DATE = "2022-05-19" # Event Date
     API_URL = f'https://api-content.ingresso.com/v0/sessions/city/{CITY_ID}/event/{EVENT_ID}?partnership=&date={DATE}'
     HEADERS = {
-        'Accept': 'application/json, text/plain, */*',
+        'Accept': 'application/json',
         'Accept-Language': 'pt-BR,pt;q=0.9',
         'Connection': 'keep-alive',
         'Origin': 'https://www.ingresso.com',
@@ -38,7 +38,7 @@ def get_cinemas(theaters):
         if(theater_name not in theaters):
             theaters.append(theater)
 
-def get_sections(theaters, sections):
+def get_sections(theaters, sections) -> None:
     for theater in theaters:
         for room in theater['rooms']:
             for session in room['sessions']:
@@ -46,7 +46,7 @@ def get_sections(theaters, sections):
                 API_URL = f'https://api.ingresso.com/v1/sessions/{SESSION_ID}/'
                 HEADERS = {
                     'authority':'api.ingresso.com',
-                    'accept': 'application/json, text/plain, */*',
+                    'accept': 'application/json',
                     'accept-language': 'pt-BR,pt;q=0.9',
                     'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="100", "Google Chrome";v="100"',
                     'sec-ch-ua-mobile': '?0',
@@ -76,21 +76,21 @@ def get_occupation(lines):
 
 
 def get_seats(sections, context: CallbackContext) -> None:
+    message = "```\n"
     for section in sections:
-        message = "```"
         theatre_name = section['theatre']['name']
-        message += f'[*] {theatre_name}\n'
+        message += f'[!] {theatre_name}\n'
         
-        SESSION_ID = section['session_id']
+        session_id = section['session_id']
         
         for unique_section in section['sections']:
             section_name = unique_section['name']
             message += f'    [+] {section_name}\n'
-            SECTION_ID = unique_section['id']
-            API_URL = f'https://api.ingresso.com/v1/sessions/{SESSION_ID}/sections/{SECTION_ID}/seats'
-            HEADERS = {
+            section_id = unique_section['id']
+            api_url = f'https://api.ingresso.com/v1/sessions/{session_id}/sections/{section_id}/seats'
+            headers = {
                 'authority':'api.ingresso.com',
-                'accept': 'application/json, text/plain, */*',
+                'accept': 'application/json',
                 'accept-language': 'pt-BR,pt;q=0.9',
                 'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="100", "Google Chrome";v="100"',
                 'sec-ch-ua-mobile': '?0',
@@ -100,12 +100,18 @@ def get_seats(sections, context: CallbackContext) -> None:
                 'sec-fetch-site': 'same-site',
                 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'                    
             }
-            req = requests.get(url=API_URL, headers=HEADERS).json()
-            lines = req['lines']
-            message += get_occupation(lines)
-            job = context.job
-            message += '```'
-            context.bot.send_message(job.context, text=message, parse_mode='Markdown')
+            response = requests.get(url=api_url, headers=headers)
+            if response.status_code == 200:
+                lines = response.json()['lines']
+                occupation = get_occupation(lines)
+                message += occupation
+            else:
+                message += f'    [+] Occupancy not available\n'
+        message += '\n'
+    message += '```'
+    print(message)
+    job = context.job
+    context.bot.send_message(job.context, text=message, parse_mode='Markdown')
 
 
 def run_tasks(context: CallbackContext) -> None:
