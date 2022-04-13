@@ -11,7 +11,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def get_cinemas(theaters) -> None:
-    CITY_ID = "22" # Recife
+    CITY_ID = "22" # Recife, 380 Caruaru
     EVENT_ID = "24985" # Twenty One Pilots Cinema Experience
     DATE = "2022-05-19" # Event Date
     API_URL = f'https://api-content.ingresso.com/v0/sessions/city/{CITY_ID}/event/{EVENT_ID}?partnership=&date={DATE}'
