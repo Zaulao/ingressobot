@@ -153,26 +153,24 @@ def get_seats_offline(sections) -> None:
     # context.bot.send_message(job.context, text=message, parse_mode='Markdown')
 
 def generate_map(lines) -> None:
-    map = ""
-    pre_line_size = 0
-    diff = 0
+    map = []
+    limit = 0
 
     for line in lines:
+        string_line = ""
         line_size = len(line['seats'])
-        if pre_line_size > line_size:
-            diff += (pre_line_size - line_size)//2
-        elif (pre_line_size < line_size) and (diff > 0):
-            diff = (line_size - pre_line_size)//2
-        for i in range(diff):
-            map += ' '
-        pre_line_size = line_size
+        if line_size > limit:
+            limit = line_size
         for seat in line['seats']:
             if seat['status'] == 'Available':
-                map += 'o'
+                string_line += 'o'
             else:
-                map += '-'
-        map += '\n'
-    print(map)
+                string_line += '-'
+        map.append(string_line)
+    
+    for line in map:
+        print(line.center(limit))
+    print('\n')
 
 def run_tasks_offline() -> None:
     THEATERS = []
