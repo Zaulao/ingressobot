@@ -78,7 +78,7 @@ def get_occupation(lines) -> str:
     return f'    [+] Occupancy: {UNAVAILABLE_SEATS}/{TOTAL_SEATS}\n'
 
 
-def get_seats(sections, context: CallbackContext) -> None:
+def get_seats(sections) -> str:
     message = "```\n"
     for section in sections:
         theatre_name = section['theatre']['name']
@@ -112,8 +112,7 @@ def get_seats(sections, context: CallbackContext) -> None:
                 message += f'    [+] Occupancy not available\n'
         message += '\n'
     message += '```'
-    job = context.job
-    context.bot.send_message(job.context, text=message, parse_mode='Markdown')
+    return message
 
 def get_seats_and_map(section) -> str:
     message = "```\n"
@@ -174,13 +173,16 @@ def generate_map(lines) -> str:
     return_map += '\n'
     return return_map  
 
-def run_tasks(update: Update, context: CallbackContext) -> None:
+def run_tasks(context: CallbackContext) -> None:
     NEW_THEATERS = []
     NEW_SECTIONS = []
 
     get_cinemas(theaters=NEW_THEATERS)
     get_sections(theaters=NEW_THEATERS, sections=NEW_SECTIONS)
-    get_seats(sections=NEW_SECTIONS, context=context)
+    message = get_seats(sections=NEW_SECTIONS)
+
+    job = context.job
+    context.bot.send_message(job.context, text=message, parse_mode='Markdown')
 
     if len(NEW_THEATERS) > 0:
         global THEATERS
@@ -222,8 +224,25 @@ def start(update: Update, context: CallbackContext) -> None:
         text = 'Alright! Now I\'ll notify you every hour, starting 5 seconds from now...'
         update.message.reply_text(text)
 
-    except (IndexError, ValueError):
-        update.message.reply_text('Error!')
+    except Exception as e:
+        update.message.reply_text(f'Error! {str(e)}')
+
+def status(update: Update, context: CallbackContext) -> None:
+    NEW_THEATERS = []
+    NEW_SECTIONS = []
+
+    get_cinemas(theaters=NEW_THEATERS)
+    get_sections(theaters=NEW_THEATERS, sections=NEW_SECTIONS)
+    message = get_seats(sections=NEW_SECTIONS)
+
+    update.message.reply_text(text=message, parse_mode='Markdown')
+
+    if len(NEW_THEATERS) > 0:
+        global THEATERS
+        THEATERS = NEW_THEATERS
+    if len(NEW_SECTIONS) > 0:
+        global SECTIONS
+        SECTIONS = NEW_SECTIONS
 
 def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
     """Remove job with given name. Returns whether job was removed."""
@@ -247,7 +266,7 @@ def main():
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("status", run_tasks))
+    dispatcher.add_handler(CommandHandler("status", status))
     dispatcher.add_handler(CommandHandler("stop", unset))
     dispatcher.add_handler(CommandHandler("map", get_map))
 
