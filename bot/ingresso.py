@@ -247,7 +247,7 @@ def main():
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("status", start))
+    dispatcher.add_handler(CommandHandler("status", run_tasks))
     dispatcher.add_handler(CommandHandler("stop", unset))
     dispatcher.add_handler(CommandHandler("map", get_map))
 
