@@ -10,6 +10,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+global THEATERS
+global SECTIONS
+
 def get_cinemas(theaters) -> None:
     CITY_ID = "22" # Recife, 380 Caruaru
     EVENT_ID = "24985" # Twenty One Pilots Cinema Experience
@@ -62,7 +65,7 @@ def get_sections(theaters, sections) -> None:
                     sections.append(updated_sections)
 
 
-def get_occupation(lines):
+def get_occupation(lines) -> str:
     TOTAL_SEATS = 0
     UNAVAILABLE_SEATS = 0 
     for line in lines:
@@ -109,52 +112,50 @@ def get_seats(sections, context: CallbackContext) -> None:
                 message += f'    [+] Occupancy not available\n'
         message += '\n'
     message += '```'
-    print(message)
     job = context.job
     context.bot.send_message(job.context, text=message, parse_mode='Markdown')
 
-def get_seats_offline(sections) -> None:
+def get_seats_and_map(section) -> str:
     message = "```\n"
-    for section in sections:
-        theatre_name = section['theatre']['name']
-        message += f'[!] {theatre_name}\n'
-        
-        session_id = section['session_id']
-        
-        for unique_section in section['sections']:
-            section_name = unique_section['name']
-            message += f'    [+] {section_name}\n'
-            section_id = unique_section['id']
-            api_url = f'https://api.ingresso.com/v1/sessions/{session_id}/sections/{section_id}/seats'
-            headers = {
-                'authority':'api.ingresso.com',
-                'accept': 'application/json',
-                'accept-language': 'pt-BR,pt;q=0.9',
-                'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="100", "Google Chrome";v="100"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Linux"',
-                'sec-fetch-dest': 'empty',
-                'sec-fetch-mode': 'cors',
-                'sec-fetch-site': 'same-site',
-                'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'                    
-            }
-            response = requests.get(url=api_url, headers=headers)
-            if response.status_code == 200:
-                lines = response.json()['lines']
-                occupation = get_occupation(lines)
-                generate_map(lines)
-
-                message += occupation
-            else:
-                message += f'    [+] Occupancy not available\n'
+    theatre_name = section['theatre']['name']
+    message += f'[!] {theatre_name}\n'
+    
+    session_id = section['session_id']
+    
+    for unique_section in section['sections']:
+        section_name = unique_section['name']
+        message += f'    [+] {section_name}\n'
+        section_id = unique_section['id']
+        api_url = f'https://api.ingresso.com/v1/sessions/{session_id}/sections/{section_id}/seats'
+        headers = {
+            'authority':'api.ingresso.com',
+            'accept': 'application/json',
+            'accept-language': 'pt-BR,pt;q=0.9',
+            'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="100", "Google Chrome";v="100"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Linux"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'                    
+        }
+        response = requests.get(url=api_url, headers=headers)
+        if response.status_code == 200:
+            lines = response.json()['lines']
+            occupation = get_occupation(lines)
+            map = generate_map(lines)
+            message += occupation
+        else:
+            message += f'    [+] Occupancy not available\n'
         message += '\n'
+    message += map
     message += '```'
-    print(message)
-    # context.bot.send_message(job.context, text=message, parse_mode='Markdown')
+    return message    
 
-def generate_map(lines) -> None:
+def generate_map(lines) -> str:
     map = []
     limit = 0
+    return_map = ''
 
     for line in lines:
         string_line = ""
@@ -169,24 +170,46 @@ def generate_map(lines) -> None:
         map.append(string_line)
     
     for line in map:
-        print(line.center(limit))
-    print('\n')
-
-def run_tasks_offline() -> None:
-    THEATERS = []
-    SECTIONS = []
-
-    get_cinemas(theaters=THEATERS)
-    get_sections(theaters=THEATERS, sections=SECTIONS)
-    get_seats_offline(sections=SECTIONS)
+        return_map += line.center(limit) + '\n'
+    return_map += '\n'
+    return return_map  
 
 def run_tasks(context: CallbackContext) -> None:
-    THEATERS = []
-    SECTIONS = []
+    NEW_THEATERS = []
+    NEW_SECTIONS = []
 
-    get_cinemas(theaters=THEATERS)
-    get_sections(theaters=THEATERS, sections=SECTIONS)
-    get_seats(sections=SECTIONS, context=context)
+    get_cinemas(theaters=NEW_THEATERS)
+    get_sections(theaters=NEW_THEATERS, sections=NEW_SECTIONS)
+    get_seats(sections=NEW_SECTIONS, context=context)
+
+    if len(NEW_THEATERS) > 0:
+        global THEATERS
+        THEATERS = NEW_THEATERS
+    if len(NEW_SECTIONS) > 0:
+        global SECTIONS
+        SECTIONS = NEW_SECTIONS    
+
+def get_map(update: Update, context: CallbackContext) -> None:
+    local_sections = SECTIONS
+    map = ''
+    try:
+        session = context.args[0:]
+        for session_arg in session:
+            for theatre in local_sections:
+                theatre_name = theatre['theatre']['name']
+                if session_arg.lower() in theatre_name.lower():
+                    map = get_seats_and_map(theatre)
+                    break
+            if map:
+                break
+        
+        if not map:
+            update.message.reply_text('Sorry, I cannot find this theatre')
+            return
+
+        update.message.reply_text(map, parse_mode='Markdown')
+    except (IndexError, ValueError):
+        update.message.reply_text('Usage: /map <theatre_name>')
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -225,9 +248,10 @@ def main():
 
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("stop", unset))
+    dispatcher.add_handler(CommandHandler("map", get_map))
 
     updater.start_polling()
     updater.idle()
 
 if __name__ == "__main__":
-    run_tasks_offline()
+    main()
