@@ -174,7 +174,7 @@ def generate_map(lines) -> str:
     return_map += '\n'
     return return_map  
 
-def run_tasks(context: CallbackContext) -> None:
+def run_tasks(update: Update, context: CallbackContext) -> None:
     NEW_THEATERS = []
     NEW_SECTIONS = []
 
@@ -247,8 +247,10 @@ def main():
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("status", start))
     dispatcher.add_handler(CommandHandler("stop", unset))
     dispatcher.add_handler(CommandHandler("map", get_map))
+
 
     updater.start_polling()
     updater.idle()
